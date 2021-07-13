@@ -35,8 +35,8 @@ else
     exit 9
 fi
 
-fqdn="$1"
-label="$2"
+label="$1"
+fqdn="$2"
 port="$3"
 
 [[ -z $fqdn ]] && echo "[ERROR] Missing FQDN" && echo "[INFO] usage: $0 fqdn label port" && exit 1 
