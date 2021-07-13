@@ -1,0 +1,3 @@
+echo "ssh example.com 22" > whitelist.conf
+sudo crontab -e 
+0 * * * * cd /mnt/fatty/projects/whitelist_by_dynamic_dns && ./wrapper.sh whitelist_by_dynamic_dns.sh whitelist.conf
