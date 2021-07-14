@@ -20,7 +20,7 @@ then
     fi
 elif [[ $platform == 'ubuntu' ]];
 then
-    ufw status | grep -q 'Status: active'
+    /usr/sbin/ufw status | grep -q 'Status: active'
     if [[ $? -eq 0 ]]; 
     then 
         alias firewall_get_number=ufw_get_number
@@ -61,15 +61,15 @@ firewalld_get_ip() {
 
 # ufw
 ufw_get_number() {
-    ufw status numbered | grep $label | awk -v FS="(\[|\])" '{print $2}'
+    /usr/sbin/ufw status numbered | grep $label | awk -v FS="(\[|\])" '{print $2}'
 }
 
 ufw_get_ip() {
-    ufw status numbered | grep $label | grep $label | awk -v FS="(ALLOW IN|#)" '{print $2}' | sed 's/ //g'
+    /usr/sbin/ufw status numbered | grep $label | grep $label | awk -v FS="(ALLOW IN|#)" '{print $2}' | sed 's/ //g'
 }
 
 ufw_add () {
-    ufw allow proto tcp from $(dig +short "$fqdn") to any port $port comment $label
+    /usr/sbin/ufw allow proto tcp from $(dig +short "$fqdn") to any port $port comment $label
 }
 
 ufw_delete () {
