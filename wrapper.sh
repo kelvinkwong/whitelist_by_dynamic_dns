@@ -9,7 +9,7 @@ do
     if [[ ! -z $fqdn ]]; then
     if [[ ! -z $port ]]; then 
     if [[ $label != "^#"* ]]; then 
-        $SCRIPTDIR/$1 $label $fqdn $port | tee -a /var/log/$1.log
+        $SCRIPTDIR/$1 $label $fqdn $port |& tee -a /var/log/$1.log
     fi
     fi 
     fi
