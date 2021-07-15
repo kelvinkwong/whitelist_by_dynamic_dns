@@ -60,10 +60,6 @@ firewalld_get_ip() {
 }
 
 # ufw
-ufw_get_number() {
-    /usr/sbin/ufw status numbered | grep $label | awk -v FS="(\[|\])" '{print $2}'
-}
-
 ufw_get_ip() {
     /usr/sbin/ufw status numbered | grep $label | grep $label | awk -v FS="(ALLOW IN|#)" '{print $2}' | sed 's/ //g'
 }
@@ -73,7 +69,8 @@ ufw_add () {
 }
 
 ufw_delete () {
-    [[ ! -z $(ufw_get_number) ]] && ufw --force delete $(ufw_get_number)
+    ufw_get_number=$(/usr/sbin/ufw status numbered | grep $label | awk -v FS="(\[|\])" '{print $2}')
+    [[ ! -z $ufw_get_number ]] && ufw --force delete $ufw_get_number
 }
 
 # logic
