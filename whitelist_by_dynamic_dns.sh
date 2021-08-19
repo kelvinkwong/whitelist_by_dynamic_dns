@@ -1,10 +1,27 @@
 #!/bin/bash 
 
 shopt -s expand_aliases
-echo [INFO] $(date)
-echo [INFO] $0 $@
 
-[[ $EUID -ne 0 ]] && echo [ERROR] needs root, expecting: sudo $0 launch_script_name && exit 999
+info () { 
+    echo "[INFO] $@" | tee -a /var/log/$0.log 
+} 
+
+debug () { 
+    [[ $DEBUG ]] && echo "[DEBUG] $@" | tee -a /var/log/$0.log 
+}
+
+warn () { 
+    echo "[WARN] $@" | tee -a /var/log/$0.log 
+}
+
+error () { 
+    echo "[ERROR] $@" | tee -a /var/log/$0.log 
+}
+
+info $(date)
+info $0 $@
+
+[[ $EUID -ne 0 ]] && error "needs root, expecting: sudo $0 launch_script_name" && exit 999
 
 platform=$(awk -F= '/^ID=/{print $2}' /etc/os-release)
 if [[ $platform == 'fedora' ]];
@@ -16,7 +33,7 @@ then
         alias firewall_delete=firewalld_delete
         alias firewall_add=firewalld_add
     else
-        echo "[ERROR] only firewalld is supported on Fedora"
+        error "only firewalld is supported on Fedora"
     fi
 elif [[ $platform == 'ubuntu' ]];
 then
@@ -28,10 +45,10 @@ then
         alias firewall_delete=ufw_delete
         alias firewall_add=ufw_add
     else
-        echo "[ERROR] only UFW is supported on Ubuntu"
+        error "only UFW is supported on Ubuntu"
     fi 
 else 
-    echo "[ERROR] platform ($platform) not supported (expecting fedora or ubuntu)" 
+    error "platform ($platform) not supported (expecting fedora or ubuntu)" 
     exit 9
 fi
 
@@ -57,7 +74,7 @@ ufw_get_ip() {
 }
 
 ufw_add () {
-    echo "[DEBUG] /usr/sbin/ufw allow proto tcp from $(get_ip) to any port $port comment $label"
+    debug "/usr/sbin/ufw allow proto tcp from $(get_ip) to any port $port comment $label"
     /usr/sbin/ufw allow proto tcp from $(get_ip) to any port $port comment $label
 }
 
@@ -82,51 +99,51 @@ whitelist () {
     fqdn="$2"
     port="$3"
 
-    [[ -z $fqdn ]] && echo "[ERROR] Missing FQDN" && echo "[INFO] usage: $0 fqdn label port" && exit 1 
-    [[ -z $label ]] && echo "[ERROR] Missing label" && echo "[INFO] usage: $0 fqdn label port" && exit 2
-    [[ -z $port ]] && echo "[ERROR] Missing port" && echo "[INFO] usage: $0 fqdn label port" && exit 3
+    [[ $label == "#"* ]] && return 1
+    [[ -z $fqdn ]] || [[ -z $label ]] || [[ -z $port ]] && info "usage: $0 fqdn label port" && return 1
 
-    # logic
-    # static ip
     new_ip=$(get_ip)
-    echo "[INFO] $fqdn = $new_ip"
+    info "$fqdn = $new_ip"
 
     old_ip=$(firewall_get_ip)
-    echo "[INFO] Old Source IP: [$old_ip]"
+    info "Old Source IP: [$old_ip]"
 
     if [[ $old_ip == $new_ip ]] 
     then
-        echo "[INFO] Same IP"
-        exit 0
+        info "Same IP"
     else
-        echo "[INFO] Different IP"
+        info "Different IP"
         firewall_delete
         firewall_add
     fi
 }
 
+read_config () { 
+    info reading $1
+    while read -r label fqdn port
+    do
+        debug "label fqdn port $label $fqdn $port" 
+        if [[ ! -z $label ]]; then
+        if [[ ! -z $fqdn ]]; then
+        if [[ ! -z $port ]]; then
+        if [[ $label != "^#"* ]]; then
+            whitelist $label $fqdn $port
+        fi
+        fi
+        fi
+        fi
+    done < $1
+}
 
-log="/var/log/$(basename $1).log"
-if [[ ! -f $1 ]]
+if [[ -f $1 ]]
 then
-    echo "[INFO] $(date)" |& tee -a $log
-    echo "[INFO] $0" |& tee -a $log
-    echo "[ERROR] $2 not found" |& tee -a $log
-    exit 1
+    read_config $1
+elif [[ -d $1 ]] 
+then 
+    for config in $(find "$1" -name "*.conf")
+    do
+        read_config $config
+    done
+else
+    error [$1] is not a file or folder
 fi
-
-while read -r label fqdn port
-do
-    echo LABEL: [$label]
-    echo FQDN: [$fqdn]
-    echo PORT: [$port]
-    if [[ ! -z $label ]]; then
-    if [[ ! -z $fqdn ]]; then
-    if [[ ! -z $port ]]; then
-    if [[ $label != "^#"* ]]; then
-        whitelist $label $fqdn $port |& tee -a $log
-    fi
-    fi
-    fi
-    fi
-done < $1
