@@ -35,17 +35,9 @@ else
     exit 9
 fi
 
-label="$1"
-fqdn="$2"
-port="$3"
-
-[[ -z $fqdn ]] && echo "[ERROR] Missing FQDN" && echo "[INFO] usage: $0 fqdn label port" && exit 1 
-[[ -z $label ]] && echo "[ERROR] Missing label" && echo "[INFO] usage: $0 fqdn label port" && exit 2
-[[ -z $port ]] && echo "[ERROR] Missing port" && echo "[INFO] usage: $0 fqdn label port" && exit 3
-
 # firewalld 
 firewalld_add () {
-    firewall-cmd --permanent --add-rich-rule="rule family=\"ipv4\" source address=\"$(dig +short $fqdn)\" port protocol=\"tcp\" port=\"$port\" accept log prefix=\"$label\""
+    firewall-cmd --permanent --add-rich-rule="rule family=\"ipv4\" source address=\"$(get_ip)\" port protocol=\"tcp\" port=\"$port\" accept log prefix=\"$label\""
     firewall-cmd --reload
 }
 
@@ -65,7 +57,8 @@ ufw_get_ip() {
 }
 
 ufw_add () {
-    /usr/sbin/ufw allow proto tcp from $(dig +short "$fqdn") to any port $port comment $label
+    echo "[DEBUG] /usr/sbin/ufw allow proto tcp from $(get_ip) to any port $port comment $label"
+    /usr/sbin/ufw allow proto tcp from $(get_ip) to any port $port comment $label
 }
 
 ufw_delete () {
@@ -73,19 +66,67 @@ ufw_delete () {
     [[ ! -z $ufw_get_number ]] && ufw --force delete $ufw_get_number
 }
 
-# logic
-new_ip=$(dig +short "$fqdn")
-echo "[INFO] $fqdn = $new_ip"
+get_ip () {
+    if [[ $fqdn =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+    then
+        ip=$fqdn
+    else
+        ip=$(dig +short "$fqdn")
+    fi
+    echo "$ip"
+}
 
-old_ip=$(firewall_get_ip)
-echo "[INFO] Old Source IP: [$old_ip]"
 
-if [[ $old_ip == $new_ip ]] 
+whitelist () {
+    label="$1"
+    fqdn="$2"
+    port="$3"
+
+    [[ -z $fqdn ]] && echo "[ERROR] Missing FQDN" && echo "[INFO] usage: $0 fqdn label port" && exit 1 
+    [[ -z $label ]] && echo "[ERROR] Missing label" && echo "[INFO] usage: $0 fqdn label port" && exit 2
+    [[ -z $port ]] && echo "[ERROR] Missing port" && echo "[INFO] usage: $0 fqdn label port" && exit 3
+
+    # logic
+    # static ip
+    new_ip=$(get_ip)
+    echo "[INFO] $fqdn = $new_ip"
+
+    old_ip=$(firewall_get_ip)
+    echo "[INFO] Old Source IP: [$old_ip]"
+
+    if [[ $old_ip == $new_ip ]] 
+    then
+        echo "[INFO] Same IP"
+        exit 0
+    else
+        echo "[INFO] Different IP"
+        firewall_delete
+        firewall_add
+    fi
+}
+
+
+log="/var/log/$(basename $1).log"
+if [[ ! -f $1 ]]
 then
-    echo "[INFO] Same IP"
-    exit 0
-else
-    echo "[INFO] Different IP"
-    firewall_delete
-    firewall_add
+    echo "[INFO] $(date)" |& tee -a $log
+    echo "[INFO] $0" |& tee -a $log
+    echo "[ERROR] $2 not found" |& tee -a $log
+    exit 1
 fi
+
+while read -r label fqdn port
+do
+    echo LABEL: [$label]
+    echo FQDN: [$fqdn]
+    echo PORT: [$port]
+    if [[ ! -z $label ]]; then
+    if [[ ! -z $fqdn ]]; then
+    if [[ ! -z $port ]]; then
+    if [[ $label != "^#"* ]]; then
+        whitelist $label $fqdn $port |& tee -a $log
+    fi
+    fi
+    fi
+    fi
+done < $1
