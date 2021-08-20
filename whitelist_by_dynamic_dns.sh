@@ -2,6 +2,8 @@
 
 shopt -s expand_aliases
 
+DNS="1.1.1.1"
+
 log="/var/log/$(basename $0).log"
 info () { 
     echo "[INFO] $@" | tee -a $log
@@ -94,7 +96,7 @@ get_ip () {
     then
         ip=$fqdn
     else
-        ip=$(dig +short "$fqdn")
+        ip=$(dig +short @"$DNS" "$fqdn")
     fi
     echo "$ip"
 }
