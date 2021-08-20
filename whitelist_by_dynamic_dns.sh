@@ -2,26 +2,32 @@
 
 shopt -s expand_aliases
 
+log="/var/log/$(basename $0).log"
 info () { 
-    echo "[INFO] $@" | tee -a /var/log/$0.log 
+    echo "[INFO] $@" | tee -a $log
 } 
 
 debug () { 
-    [[ $DEBUG ]] && echo "[DEBUG] $@" | tee -a /var/log/$0.log 
+    [[ $DEBUG ]] && echo "[DEBUG] $@" | tee -a $log
 }
 
 warn () { 
-    echo "[WARN] $@" | tee -a /var/log/$0.log 
+    echo "[WARN] $@" | tee -a $log
 }
 
 error () { 
-    echo "[ERROR] $@" | tee -a /var/log/$0.log 
+    echo "[ERROR] $@" | tee -a $log
 }
+
+critical () { 
+    echo "[CRITICAL] $@" | tee -a $log
+    exit $2
+}
+
+[[ $EUID -ne 0 ]] && critical "needs root, expecting: sudo $0 whitelist.conf[whitelist_folder]" 999
 
 info $(date)
 info $0 $@
-
-[[ $EUID -ne 0 ]] && error "needs root, expecting: sudo $0 launch_script_name" && exit 999
 
 platform=$(awk -F= '/^ID=/{print $2}' /etc/os-release)
 if [[ $platform == 'fedora' ]];
