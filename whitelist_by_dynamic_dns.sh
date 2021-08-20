@@ -96,7 +96,8 @@ get_ip () {
     then
         ip=$fqdn
     else
-        ip=$(dig +short @"$DNS" "$fqdn")
+        ip=$(dig +short "$fqdn")
+        [[ -z $ip ]] && ip=$(dig +short @"$DNS" "$fqdn")
     fi
     echo "$ip"
 }
