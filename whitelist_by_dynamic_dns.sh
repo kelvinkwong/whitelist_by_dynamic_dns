@@ -87,8 +87,11 @@ ufw_add () {
 }
 
 ufw_delete () {
-    ufw_get_number=$(/usr/sbin/ufw status numbered | grep $label | awk -v FS="(\[|\])" '{print $2}')
-    [[ ! -z $ufw_get_number ]] && ufw --force delete $ufw_get_number
+    ufw_get_number=$(/usr/sbin/ufw status numbered | sort -r | grep $label | awk -v FS="(\[|\])" '{print $2}')
+    for old_rule in $ufw_get_number
+    do
+        [[ ! -z $old_rule ]] && ufw --force delete $old_rule
+    done
 }
 
 get_ip () {
@@ -97,6 +100,7 @@ get_ip () {
         ip=$fqdn
     else
         ip=$(dig +short "$fqdn")
+        ip=$(dig +short @"$DNS" "$fqdn")
         [[ -z $ip ]] && ip=$(dig +short @"$DNS" "$fqdn")
     fi
     echo "$ip"
@@ -108,7 +112,6 @@ whitelist () {
     fqdn="$2"
     port="$3"
 
-    [[ $label == "#"* ]] && return 1
     [[ -z $fqdn ]] || [[ -z $label ]] || [[ -z $port ]] && info "usage: $0 fqdn label port" && return 1
 
     new_ip=$(get_ip)
@@ -129,14 +132,23 @@ whitelist () {
 
 read_config () { 
     info reading $1
+    filename="$(basename $1)"
+    owner="${filename%.*}"
     while read -r label fqdn port
     do
+        [[ $label == "#"* ]] && warn [SKIPPED] $label $fqdn $port && continue
+
+        label=$port
+        [[ "$port" == "443" ]] && label="https"
+        [[ "$port" == "22" ]] && label="ssh"
+        [[ "$port" == "444" ]] && label="jumper"
+
         debug "label fqdn port $label $fqdn $port" 
         if [[ ! -z $label ]]; then
         if [[ ! -z $fqdn ]]; then
         if [[ ! -z $port ]]; then
         if [[ $label != "^#"* ]]; then
-            whitelist $label $fqdn $port
+            whitelist "${owner}_${label}" $fqdn $port
         fi
         fi
         fi
