@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  ubuntu-ufw-example:
+    image: ubuntu:latest
+    restart: always
+    build:
+      context: ./
+      dockerfile: ubuntu-ufw.Dockerfile
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    volumes:
+      - ../whitelist_by_dynamic_dns.sh:/root/whitelist_by_dynamic_dns.sh:ro
+      - ../whitelist.example.conf:/root/somebody@example.com.conf:ro
+    cap_add:
+      - NET_ADMIN
+
+# docker compose -f ubuntu-ufw.docker-compose.yml up --build -d
+# ./whitelist_by_dynamic_dns.sh somebody@example.com

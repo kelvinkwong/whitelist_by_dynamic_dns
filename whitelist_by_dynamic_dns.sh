@@ -42,6 +42,7 @@ then
         alias firewall_add=firewalld_add
     else
         error "only firewalld is supported on Fedora"
+        exit 1
     fi
 elif [[ $platform == 'ubuntu' ]];
 then
@@ -53,7 +54,9 @@ then
         alias firewall_delete=ufw_delete
         alias firewall_add=ufw_add
     else
-        error "only UFW is supported on Ubuntu"
+        error "UFW not enabled"
+        info "[HELP] apt install -y ufw && ufw enable"
+        exit 1
     fi 
 else 
     error "platform ($platform) not supported (expecting fedora or ubuntu)" 
@@ -67,7 +70,7 @@ firewalld_add () {
 }
 
 firewalld_delete () {
-    rule="$(firewall-cmd --list-rich-rules | grep $label)"
+    local rule="$(firewall-cmd --list-rich-rules | grep $label)"
     firewall-cmd --permanent --remove-rich-rule="$rule"
     firewall-cmd --reload
 }
@@ -87,7 +90,7 @@ ufw_add () {
 }
 
 ufw_delete () {
-    ufw_get_number=$(/usr/sbin/ufw status numbered | sort -r | grep $label | awk -v FS="(\[|\])" '{print $2}')
+    local ufw_get_number=$(/usr/sbin/ufw status numbered | sort -r | grep $label | awk -v FS="(\[|\])" '{print $2}')
     for old_rule in $ufw_get_number
     do
         [[ ! -z $old_rule ]] && ufw --force delete $old_rule
@@ -95,8 +98,14 @@ ufw_delete () {
 }
 
 get_ip () {
-    if [[ $fqdn =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+    local ip=""
+    if [[ $fqdn =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]
     then
+        # Note it doesnt test the authenticity of the IP, eg. >256 for any of the octets
+        ip=$fqdn
+    elif [[ $fqdn =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]
+    then
+        # Note it doesnt test the authenticity of the IP, eg. >256 for any of the octets
         ip=$fqdn
     else
         ip=$(dig +short "$fqdn")
@@ -111,6 +120,8 @@ whitelist () {
     label="$1"
     fqdn="$2"
     port="$3"
+
+    debug "$LINENO: label fqdn port $label $fqdn $port"
 
     [[ -z $fqdn ]] || [[ -z $label ]] || [[ -z $port ]] && info "usage: $0 fqdn label port" && return 1
 
@@ -134,22 +145,19 @@ read_config () {
     info reading $1
     filename="$(basename $1)"
     owner="${filename%.*}"
-    while read -r label fqdn port
+    while read -r fqdn port
     do
-        [[ $label == "#"* ]] && warn [SKIPPED] $label $fqdn $port && continue
+        [[ $fqdn =~ ^#.* ]] && warn [SKIPPED] $fqdn $port && continue
 
         label=$port
         [[ "$port" == "443" ]] && label="https"
         [[ "$port" == "22" ]] && label="ssh"
-        [[ "$port" == "444" ]] && label="jumper"
 
-        debug "label fqdn port $label $fqdn $port" 
+        debug "$LINENO: label fqdn port $label $fqdn $port"
         if [[ ! -z $label ]]; then
         if [[ ! -z $fqdn ]]; then
         if [[ ! -z $port ]]; then
-        if [[ $label != "^#"* ]]; then
             whitelist "${owner}_${label}" $fqdn $port
-        fi
         fi
         fi
         fi
