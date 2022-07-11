@@ -117,13 +117,13 @@ get_ip () {
 
 
 whitelist () {
-    label="$1"
-    fqdn="$2"
-    port="$3"
+    local label="$1"
+    local fqdn="$2"
+    local port="$3"
 
-    debug "$LINENO: label fqdn port $label $fqdn $port"
-
-    [[ -z $fqdn ]] || [[ -z $label ]] || [[ -z $port ]] && info "usage: $0 fqdn label port" && return 1
+    debug "$LINENO: label [$label]"
+    debug "$LINENO: fqdn  [$fqdn]"
+    debug "$LINENO: port  [$port]"
 
     new_ip=$(get_ip)
     info "$fqdn = $new_ip"
@@ -145,22 +145,30 @@ read_config () {
     info reading $1
     filename="$(basename $1)"
     owner="${filename%.*}"
-    while read -r fqdn port
+    while IFS=, read port fqdn
     do
-        [[ $fqdn =~ ^#.* ]] && warn [SKIPPED] $fqdn $port && continue
+        [[ -z $fqdn ]] && warn [SKIPPED] [$port] [$fqdn] && continue
+        [[ -z $port ]] && warn [SKIPPED] [$port] [$fqdn] && continue
+        [[ $port =~ ^#.* ]] && warn [SKIPPED] [$port] [$fqdn] && continue
 
-        label=$port
+        local label=$port
         [[ "$port" == "443" ]] && label="https"
         [[ "$port" == "22" ]] && label="ssh"
 
-        debug "$LINENO: label fqdn port $label $fqdn $port"
-        if [[ ! -z $label ]]; then
-        if [[ ! -z $fqdn ]]; then
-        if [[ ! -z $port ]]; then
-            whitelist "${owner}_${label}" $fqdn $port
-        fi
-        fi
-        fi
+        debug "$LINENO: label [$label]"
+        debug "$LINENO: fqdn  [$fqdn]"
+        debug "$LINENO: port  [$port]"
+
+        local OIFS=$IFS
+        local IFS=' '
+        local fqdns=($fqdn)
+        IFS=$OIFS
+        local occurance=0
+        for fqdn in ${fqdns[@]}
+        do
+            occurance=$((occurance + 1))
+            whitelist "${owner}_${label}_${occurance}" $fqdn $port
+        done
     done < $1
 }
 
