@@ -31,21 +31,19 @@ critical () {
 info $(date)
 info $0 $@
 
-platform=$(awk -F= '/^ID=/{print $2}' /etc/os-release)
-if [[ $platform == 'fedora' ]];
-then 
+if grep -q 'fedora' /etc/os-release; then
     if [[ $(firewall-cmd --state) == 'running' ]];
     then 
         alias firewall_get_number=firewalld_get_number
         alias firewall_get_ip=firewalld_get_ip
         alias firewall_delete=firewalld_delete
         alias firewall_add=firewalld_add
+        platform='fedora'
     else
         error "only firewalld is supported on Fedora"
         exit 1
     fi
-elif [[ $platform == 'ubuntu' ]];
-then
+if grep -q 'ubuntu' /etc/os-release; then
     /usr/sbin/ufw status | grep -q 'Status: active'
     if [[ $? -eq 0 ]]; 
     then 
@@ -53,6 +51,7 @@ then
         alias firewall_get_ip=ufw_get_ip
         alias firewall_delete=ufw_delete
         alias firewall_add=ufw_add
+        platform='ubuntu'
     else
         error "UFW not enabled"
         info "[HELP] apt install -y ufw && ufw enable"
@@ -145,7 +144,7 @@ read_config () {
     info reading $1
     filename="$(basename $1)"
     owner="${filename%.*}"
-    while IFS=, read port fqdn
+    while IFS=, read port fqdn comment
     do
         [[ -z $fqdn ]] && warn [SKIPPED] [$port] [$fqdn] && continue
         [[ -z $port ]] && warn [SKIPPED] [$port] [$fqdn] && continue
