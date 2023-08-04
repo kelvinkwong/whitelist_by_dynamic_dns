@@ -32,8 +32,7 @@ info $(date)
 info $0 $@
 
 if grep -q 'fedora' /etc/os-release; then
-    if [[ $(firewall-cmd --state) == 'running' ]];
-    then 
+    if [[ $(firewall-cmd --state) == 'running' ]]; then
         alias firewall_get_number=firewalld_get_number
         alias firewall_get_ip=firewalld_get_ip
         alias firewall_delete=firewalld_delete
@@ -43,10 +42,8 @@ if grep -q 'fedora' /etc/os-release; then
         error "only firewalld is supported on Fedora"
         exit 1
     fi
-if grep -q 'ubuntu' /etc/os-release; then
-    /usr/sbin/ufw status | grep -q 'Status: active'
-    if [[ $? -eq 0 ]]; 
-    then 
+elif grep -q 'ubuntu' /etc/os-release; then
+    if /usr/sbin/ufw status | grep -q 'Status: active'; then
         alias firewall_get_number=ufw_get_number
         alias firewall_get_ip=ufw_get_ip
         alias firewall_delete=ufw_delete
@@ -146,9 +143,9 @@ read_config () {
     owner="${filename%.*}"
     while IFS=, read port fqdn comment
     do
-        [[ -z $fqdn ]] && warn [SKIPPED] [$port] [$fqdn] && continue
-        [[ -z $port ]] && warn [SKIPPED] [$port] [$fqdn] && continue
-        [[ $port =~ ^#.* ]] && warn [SKIPPED] [$port] [$fqdn] && continue
+        [[ -z $fqdn ]] && warn [SKIPPED1] [$port] [$fqdn] && continue
+        [[ -z $port ]] && warn [SKIPPED2] [$port] [$fqdn] && continue
+        [[ $port =~ ^#.* ]] && warn [SKIPPED3] [$port] [$fqdn] && continue
 
         local label=$port
         [[ "$port" == "443" ]] && label="https"
