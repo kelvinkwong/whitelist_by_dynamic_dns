@@ -61,7 +61,7 @@ fi
 
 # firewalld 
 firewalld_add () {
-    firewall-cmd --permanent --add-rich-rule="rule family=\"ipv4\" source address=\"$(get_ip)\" port protocol=\"tcp\" port=\"$port\" accept log prefix=\"$label\""
+    firewall-cmd --permanent --add-rich-rule="rule family=\"ipv4\" source address=\"$(get_ip)\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
     firewall-cmd --reload
 }
 
@@ -72,17 +72,19 @@ firewalld_delete () {
 }
 
 firewalld_get_ip() {
-    firewall-cmd --list-rich-rules | grep $label | grep -o -P '(?<=source address=").*(?=" port)'
+#    firewall-cmd --list-rich-rules | grep $label | grep -o -P '(?<=source address=").*(?=" port)'
+    firewall-cmd --list-rich-rules | grep $label | grep -o "[0-9]*\\.[0-9]*\\.[0-9]*\\.[0-9]*"
 }
 
 # ufw
 ufw_get_ip() {
-    /usr/sbin/ufw status numbered | grep $label | grep $label | awk -v FS="(ALLOW IN|#)" '{print $2}' | sed 's/ //g'
+    # /usr/sbin/ufw status numbered | grep $label | grep $label | awk -v FS="(ALLOW IN|#)" '{print $2}' | sed 's/ //g'
+    /usr/sbin/ufw status numbered | grep $label | grep -o "[0-9]*\\.[0-9]*\\.[0-9]*\\.[0-9]*"
 }
 
 ufw_add () {
-    debug "/usr/sbin/ufw allow proto tcp from $(get_ip) to any port $port comment $label"
-    /usr/sbin/ufw allow proto tcp from $(get_ip) to any port $port comment $label
+    debug "/usr/sbin/ufw allow proto ${protocol} from $(get_ip) to any port $port comment $label"
+    /usr/sbin/ufw allow proto ${protocol} from $(get_ip) to any port $port comment $label
 }
 
 ufw_delete () {
@@ -116,16 +118,16 @@ whitelist () {
     local label="$1"
     local fqdn="$2"
     local port="$3"
+    local protocol="$4"
 
     debug "$LINENO: label [$label]"
     debug "$LINENO: fqdn  [$fqdn]"
     debug "$LINENO: port  [$port]"
+    debug "$LINENO: protocol  [$protocol]"
 
     new_ip=$(get_ip)
-    info "$fqdn = $new_ip"
-
     old_ip=$(firewall_get_ip)
-    info "Old Source IP: [$old_ip]"
+    info "$fqdn, old:$old_ip, new:$new_ip, port:${port}/${protocol}"
 
     if [[ $old_ip == $new_ip ]] 
     then
@@ -147,13 +149,24 @@ read_config () {
         [[ -z $port ]] && warn [SKIPPED2] [$port] [$fqdn] && continue
         [[ $port =~ ^#.* ]] && warn [SKIPPED3] [$port] [$fqdn] && continue
 
+        protocol=$(echo $port | awk -F '/' '{print $2}')
+        port=$(echo $port | awk -F '/' '{print $1}')
+
+        [[ -z "${protocol}" ]] && protocol='tcp'
+
         local label=$port
-        [[ "$port" == "443" ]] && label="https"
+        [[ "$port" == "21" ]] && label="ftp_request"
         [[ "$port" == "22" ]] && label="ssh"
+        [[ "$port" == "80" ]] && label="http"
+        [[ "$port" == "443" ]] && label="https"
+        [[ "$port" == "21000" ]] && label="ftp_data"
+        [[ "$port" == "1194" ]] && label="openvpn"
+        [[ "$port" == "51820" ]] && label="wireguard"
 
         debug "$LINENO: label [$label]"
         debug "$LINENO: fqdn  [$fqdn]"
         debug "$LINENO: port  [$port]"
+        debug "$LINENO: protocol  [$protocol]"
 
         local OIFS=$IFS
         local IFS=' '
@@ -163,7 +176,7 @@ read_config () {
         for fqdn in ${fqdns[@]}
         do
             occurance=$((occurance + 1))
-            whitelist "${owner}_${label}_${occurance}" $fqdn $port
+            whitelist "${owner}_${label}_${occurance}" $fqdn $port $protocol
         done
     done < $1
 }
