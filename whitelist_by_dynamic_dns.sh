@@ -61,18 +61,16 @@ fi
 
 # firewalld 
 firewalld_add () {
-    local ip=$1
-
-    rule="rule family=\"ipv4\" source address=\"$ip\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
+    rule="rule family=\"ipv4\" source address=\"${new_ip}\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
     command="firewall-cmd --permanent --add-rich-rule=\"$rule\""
     info $command
     eval $command
-#    firewall-cmd --permanent --add-rich-rule="rule family=\"ipv4\" source address=\"$(get_ip)\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
     firewall-cmd --reload
 }
 
 firewalld_delete () {
     local rule="$(firewall-cmd --list-rich-rules | grep $label)"
+
     firewall-cmd --permanent --remove-rich-rule="$rule"
     firewall-cmd --reload
 }
@@ -89,15 +87,14 @@ ufw_get_ip() {
 }
 
 ufw_add () {
-    local ip=$1
-
-    command="/usr/sbin/ufw allow proto ${protocol} from $ip to any port $port comment $label"
+    command="/usr/sbin/ufw allow proto ${protocol} from ${new_ip} to any port $port comment $label"
     info $command
     eval $command
 }
 
 ufw_delete () {
     local ufw_get_number=$(/usr/sbin/ufw status numbered | sort -r | grep $label | awk -v FS="(\[|\])" '{print $2}')
+
     for old_rule in $ufw_get_number
     do
         [[ ! -z $old_rule ]] && ufw --force delete $old_rule
@@ -105,8 +102,6 @@ ufw_delete () {
 }
 
 query_dns () {
-    local fqdn=$1
-
     # https://serverfault.com/questions/965368/how-do-i-ask-dig-to-only-return-the-ip-from-a-cname-record#comment1435301_965488
     # dig +noall +yaml +answer @"$DNS" "$fqdn" | awk '/IN\s+A/ {print $NF}'
 
@@ -115,7 +110,6 @@ query_dns () {
 }
 
 get_ip () {
-    local fqdn=$1
     local ip=""
 
     if [[ $fqdn =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]
@@ -128,25 +122,25 @@ get_ip () {
         ip=$fqdn
     else
         # ip=$(dig +short @"$DNS" "$fqdn")
-        ip=$(query_dns $fqdn)
-        [[ -z $ip ]] && sleep 5 && ip=$(query_dns $fqdn)
+        ip=$(query_dns)
+        [[ -z $ip ]] && sleep 5 && ip=$(query_dns)
     fi
     echo "$ip"
 }
 
 
 whitelist () {
-    local label="$1"
-    local fqdn="$2"
-    local port="$3"
-    local protocol="$4"
+    label="$1"
+    fqdn="$2"
+    port="$3"
+    protocol="$4"
 
     debug "$LINENO: label [$label]"
     debug "$LINENO: fqdn  [$fqdn]"
     debug "$LINENO: port  [$port]"
     debug "$LINENO: protocol  [$protocol]"
 
-    new_ip=$(get_ip $fqdn)
+    new_ip=$(get_ip)
     old_ip=$(firewall_get_ip)
     info "$fqdn, old:$old_ip, new:$new_ip, port:${port}/${protocol}"
 
@@ -156,7 +150,7 @@ whitelist () {
     else
         info "Different IP"
         firewall_delete
-        firewall_add $new_ip
+        firewall_add
     fi
 }
 
