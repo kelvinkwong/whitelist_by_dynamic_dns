@@ -61,7 +61,11 @@ fi
 
 # firewalld 
 firewalld_add () {
-    firewall-cmd --permanent --add-rich-rule="rule family=\"ipv4\" source address=\"$(get_ip)\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
+    rule="rule family=\"ipv4\" source address=\"$(get_ip)\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
+    command="firewall-cmd --permanent --add-rich-rule=\"$rule\""
+    info $command
+    eval $command
+#    firewall-cmd --permanent --add-rich-rule="rule family=\"ipv4\" source address=\"$(get_ip)\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
     firewall-cmd --reload
 }
 
@@ -95,8 +99,16 @@ ufw_delete () {
     done
 }
 
+query_dns () {
+    local fqdn=$1
+
+    dig +noall +answer @"$DNS" "$fqdn" | awk '/IN\tA/ {print $5}'
+}
+
 get_ip () {
+    local fqdn=$1
     local ip=""
+
     if [[ $fqdn =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]
     then
         # Note it doesnt test the authenticity of the IP, eg. >256 for any of the octets
@@ -106,9 +118,9 @@ get_ip () {
         # Note it doesnt test the authenticity of the IP, eg. >256 for any of the octets
         ip=$fqdn
     else
-        ip=$(dig +short "$fqdn")
-        ip=$(dig +short @"$DNS" "$fqdn")
-        [[ -z $ip ]] && ip=$(dig +short @"$DNS" "$fqdn")
+        # ip=$(dig +short @"$DNS" "$fqdn")
+        ip=$(query_dns $fqdn)
+        [[ -z $ip ]] && sleep 5 && ip=$(query_dns $fqdn)
     fi
     echo "$ip"
 }
@@ -125,7 +137,7 @@ whitelist () {
     debug "$LINENO: port  [$port]"
     debug "$LINENO: protocol  [$protocol]"
 
-    new_ip=$(get_ip)
+    new_ip=$(get_ip $fqdn)
     old_ip=$(firewall_get_ip)
     info "$fqdn, old:$old_ip, new:$new_ip, port:${port}/${protocol}"
 
