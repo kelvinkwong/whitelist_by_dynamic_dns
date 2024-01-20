@@ -61,7 +61,9 @@ fi
 
 # firewalld 
 firewalld_add () {
-    rule="rule family=\"ipv4\" source address=\"$(get_ip)\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
+    local ip=$1
+
+    rule="rule family=\"ipv4\" source address=\"$ip\" port protocol=\"${protocol}\" port=\"$port\" accept log prefix=\"$label\""
     command="firewall-cmd --permanent --add-rich-rule=\"$rule\""
     info $command
     eval $command
@@ -87,8 +89,11 @@ ufw_get_ip() {
 }
 
 ufw_add () {
-    debug "/usr/sbin/ufw allow proto ${protocol} from $(get_ip) to any port $port comment $label"
-    /usr/sbin/ufw allow proto ${protocol} from $(get_ip) to any port $port comment $label
+    local ip=$1
+
+    command="/usr/sbin/ufw allow proto ${protocol} from $ip to any port $port comment $label"
+    info $command
+    eval $command
 }
 
 ufw_delete () {
@@ -102,7 +107,11 @@ ufw_delete () {
 query_dns () {
     local fqdn=$1
 
-    dig +noall +answer @"$DNS" "$fqdn" | awk '/IN\tA/ {print $5}'
+    # https://serverfault.com/questions/965368/how-do-i-ask-dig-to-only-return-the-ip-from-a-cname-record#comment1435301_965488
+    # dig +noall +yaml +answer @"$DNS" "$fqdn" | awk '/IN\s+A/ {print $NF}'
+
+    # https://serverfault.com/a/965488
+    curl --silent -H 'accept: application/dns-json' "https://cloudflare-dns.com/dns-query?name=${fqdn}&type=A" | jq -r -c '.Answer[] | select(.type == 1) | .data'
 }
 
 get_ip () {
@@ -147,7 +156,7 @@ whitelist () {
     else
         info "Different IP"
         firewall_delete
-        firewall_add
+        firewall_add $new_ip
     fi
 }
 
